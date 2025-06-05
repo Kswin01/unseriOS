@@ -4,9 +4,15 @@ CURR_DIR := $(abspath .)
 BOOT_DIR := $(CURR_DIR)/boot
 KERNEL_DIR := $(CURR_DIR)/kernel
 
-KERNEL_FILES := $(addprefix $(BUILD_DIR)/, boot.o kernel.o)
 LINKER_FILE := $(BOOT_DIR)/linker.ld
 IMAGE_FILE := $(BUILD_DIR)/kernel.elf
+
+LIBC := $(BUILD_DIR)/libc.a
+LIBC_SRC := $(abspath libc/src)
+LIBC_INC := $(abspath libc/include)
+LIBC_OBJS := $(patsubst $(LIBC_SRC)/%.c, $(BUILD_DIR)/%.o, $(wildcard $(LIBC_SRC)/*.c))
+
+KERNEL_OBJS := $(addprefix $(BUILD_DIR)/, boot.o kernel.o)
 
 # Move this to clang eventually
 TOOLCHAIN := aarch64-none-elf
@@ -20,14 +26,12 @@ AR := $(TOOLCHAIN)-ar
 RANLIB := $(TOOLCHAIN)-ranlib
 OBJCOPY := $(TOOLCHAIN)-objcopy
 
-vpath %.c $(BOOT_DIR) $(KERNEL_DIR)
-vpath %.s $(BOOT_DIR) $(KERNEL_DIR)
+vpath %.c $(BOOT_DIR) $(KERNEL_DIR)/src
+vpath %.s $(BOOT_DIR) $(KERNEL_DIR)/src
 
-# $(BUILD_DIR)/%.elf: $(BUILD_DIR)/%.o
-# 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
-
-CFLAGS := -ffreestanding
-LDFLAGS := -nostdlib
+CFLAGS := -ffreestanding -nostdlib -g3 -I$(KERNEL_INC) -I$(LIBC_INC) 
+LDFLAGS := -nostdlib -T$(LINKER_FILE)
+LIBS := $(LIBC)
 
 $(BUILD_DIR)/%.o: %.c | build
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -36,13 +40,22 @@ $(BUILD_DIR)/%.o: %.s | build
 	$(AS) -g -mcpu=$(CPU) $< -o $@
 
 # This is just the last linker step
-${IMAGE_FILE}: ${KERNEL_FILES} ${LINKER_FILE}
-	$(LD) $(LDFLAGS) -T$(LINKER_FILE) $(KERNEL_FILES) -o $(IMAGE_FILE)
+${IMAGE_FILE}: $(LIBC) ${KERNEL_OBJS} ${LINKER_FILE}
+	$(LD) $(LDFLAGS) $(KERNEL_OBJS) $(LIBS) -o $(IMAGE_FILE)
+
+# Build libc.a from all libc/src/*.c
+$(LIBC): $(LIBC_OBJS) | build
+	$(AR) rcs $@ $^
+	$(RANLIB) $@
+
+# Compile libc .c files
+$(BUILD_DIR)/%.o: $(LIBC_SRC)/%.c | build 
+	$(CC) $(CFLAGS) -c $< -o $@
 
 build:
 	mkdir -p $(BUILD_DIR)
 
-all: $(IMAGE_FILE)
+all: $(LIBC) $(IMAGE_FILE)
 
 qemu: $(IMAGE_FILE)
 	$(QEMU) -machine virt \
@@ -50,7 +63,12 @@ qemu: $(IMAGE_FILE)
 			-device loader,file=$(IMAGE_FILE),addr=0x40100000,cpu-num=0 \
 			-m size=2G \
 			-nographic \
+# 			-d guest_errors
+
+-include util/util.mk
 
 # Clean build
 clean:
 	rm -rf $(BUILD_DIR)
+
+
