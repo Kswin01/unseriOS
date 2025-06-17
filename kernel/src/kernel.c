@@ -17,7 +17,7 @@ void kmain(void) {
     puts("kernel_starting...\nWELCOME TO unseriOS!\n\n");
 
     // Enable the Generic Interrupt Controller
-    init_gic_v3();
+    init_gic_v3(QEMU_GICV3_REGS);
 
     // Deal with CPU state: Disable FPU, init exception vector tables, initialise IRQ controller
     init_cpu();
