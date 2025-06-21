@@ -6,6 +6,8 @@
 #include <interrupt.h>
 #include <uart.h>
 #include <cpu.h>
+#include <mem.h>
+#include <traps.h>
 
 // Useful information for the generic qemu virt aarch64 platform
 #include <qemu_virt_aarch64_registers.h>

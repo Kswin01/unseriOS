@@ -1,6 +1,6 @@
 #pragma once
 
-#include <util.h>
+#include "util.h"
 
 // Taken from: https://github.com/au-ts/sddf/blob/main/drivers/serial/arm/include/uart.h
 
