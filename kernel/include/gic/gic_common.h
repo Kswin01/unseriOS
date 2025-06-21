@@ -30,7 +30,7 @@
 
 /* Highest possible interrupt priorities */
 #define GIC_HIGHEST_SEC_PRIORITY	U(0x00)
-#define GIC_HIGHEST_NS_PRIORITY		U(0x80)
+#define GIC_HIGHEST_NS_PRIORITY		U(0xa0)
 
 /*******************************************************************************
  * Common GIC Distributor interface register offsets

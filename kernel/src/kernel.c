@@ -16,6 +16,8 @@ void kmain(void) {
 
     puts("kernel_starting...\nWELCOME TO unseriOS!\n\n");
 
+    init_vector_table();
+
     // Enable the Generic Interrupt Controller
     init_gic_v3(QEMU_GICV3_REGS);
 

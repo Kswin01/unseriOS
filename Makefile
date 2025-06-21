@@ -13,7 +13,7 @@ LIBC_SRC := $(abspath libc/src)
 LIBC_INC := $(abspath libc/include)
 LIBC_OBJS := $(patsubst $(LIBC_SRC)/%.c, $(BUILD_DIR)/%.o, $(wildcard $(LIBC_SRC)/*.c))
 
-KERNEL_OBJS := $(addprefix $(BUILD_DIR)/, boot.o kernel.o interrupt.o uart.o cpu.o mem.o)
+KERNEL_OBJS := $(addprefix $(BUILD_DIR)/, boot.o kernel.o interrupt.o uart.o cpu.o mem.o c_traps.o traps.o)
 
 # Move this to clang eventually
 TOOLCHAIN := aarch64-none-elf
@@ -29,8 +29,10 @@ OBJCOPY := $(TOOLCHAIN)-objcopy
 
 vpath %.c $(BOOT_DIR) $(KERNEL_DIR)/src
 vpath %.s $(BOOT_DIR) $(KERNEL_DIR)/src
+vpath %.S $(BOOT_DIR) $(KERNEL_DIR)/src
 
 CFLAGS := -ffreestanding -nostdlib -g3 -I$(KERNEL_INC) -I$(LIBC_INC)
+ASM_FLAGS := -I$(KERNEL_INC) 
 LDFLAGS := -nostdlib -T$(LINKER_FILE)
 LIBS := $(LIBC)
 
@@ -39,6 +41,9 @@ $(BUILD_DIR)/%.o: %.c | build
 
 $(BUILD_DIR)/%.o: %.s | build
 	$(AS) -g -mcpu=$(CPU) $< -o $@
+
+$(BUILD_DIR)/%.o: %.S | build
+	$(CC) $(ASM_FLAGS) -x assembler-with-cpp -c -mcpu=$(CPU) $< -o $@
 
 # This is just the last linker step
 ${IMAGE_FILE}: $(LIBC) ${KERNEL_OBJS} ${LINKER_FILE}

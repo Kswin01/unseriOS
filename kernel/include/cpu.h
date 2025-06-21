@@ -1,3 +1,3 @@
 #pragma once
 
-void cpu_init();
+void init_cpu();
