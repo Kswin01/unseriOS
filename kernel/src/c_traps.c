@@ -23,16 +23,24 @@ void __attribute__((externally_visible)) __attribute__((noinline)) kernel_halt(v
 
 void __attribute__((externally_visible)) __attribute__((noinline)) sync_abort (void) {
     puts("We received a synchronous abort!\n");
-    while(1) {
-        asm("nop");
-    }
+    uint32_t esr;
+    MRS("esr_el1", esr);
+    puts("This is the esr: ");
+    puthex32(esr);
+    puts("\n");
+    kernel_halt();
 }
+
+void __attribute__((externally_visible)) __attribute__((noinline)) async_abort (void) {
+    // ARM SError's refer to aynchronous aborts
+    puts("We received an asynchronous abort!\n");
+    kernel_halt();
+}
+
 
 void __attribute__((externally_visible)) __attribute__((noinline)) handle_interrupt (void) {
     puts("We received an interrupt!\n");
-    while(1) {
-        asm("nop");
-    }
+    kernel_halt();
 }
 
 void init_vector_table(void) {

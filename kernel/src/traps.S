@@ -34,7 +34,7 @@ BEGIN_FUNC(arm_vector_table)
     ventry  priv_el_sync                    // Current EL Synchronous (EL1/2)
     ventry  priv_el_irq                     // IRQ
     ventry  invalid_vector_entry           // FIQ
-    ventry  invalid_vector_entry                    // SError
+    ventry  priv_el_async                    // SError
 
     ventry  invalid_vector_entry                  // Synchronous 64-bit EL0/EL1
     ventry  invalid_vector_entry                   // IRQ 64-bit EL0/EL1
@@ -62,3 +62,7 @@ END_FUNC(priv_el_sync)
 BEGIN_FUNC(priv_el_irq)
     b handle_interrupt
 END_FUNC(priv_el_irq)
+
+BEGIN_FUNC(priv_el_async)
+    b async_abort
+END_FUNC(priv_el_async)

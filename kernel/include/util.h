@@ -10,6 +10,20 @@ hexchar(unsigned int v)
 }
 
 static void
+puthex32(uint32_t val)
+{
+    char buffer[8 + 3];
+    buffer[0] = '0';
+    buffer[1] = 'x';
+    buffer[8 + 3 - 1] = 0;
+    for (unsigned i = 8 + 1; i > 1; i--) {
+        buffer[i] = hexchar(val & 0xf);
+        val >>= 4;
+    }
+    puts(buffer);
+}
+
+static void
 puthex64(uint64_t val)
 {
     char buffer[16 + 3];
@@ -43,7 +57,9 @@ puthex64(uint64_t val)
 #define CLR_BIT_REG_MASK(addr,mask) (*(volatile uint32_t *)(addr) &= ~(mask))
 
 #define MRC(cpreg, v)  asm volatile("mrc  " cpreg :  "=r"(v))
+// Read from register (move system register to general purpose regsiter)
 #define MRS(reg, v)  asm volatile("mrs %x0," reg : "=r"(v))
+// Write to register (move general purpose regsiter to system regsiter)
 #define MSR(reg, v)                                     \
     do {                                                \
         uint64_t _v = v;                                \

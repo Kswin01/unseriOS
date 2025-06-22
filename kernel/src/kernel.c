@@ -16,7 +16,7 @@ void kmain(void) {
     // Enable UART device -> all setup for the PL011.
     init_uart(PL011_UART_REGS);
 
-    puts("kernel_starting...\nWELCOME TO unseriOS!\n\n");
+    puts("kernel_starting...\n\n-------------------- WELCOME TO unseriOS! --------------------\n\n");
 
     init_vector_table();
 

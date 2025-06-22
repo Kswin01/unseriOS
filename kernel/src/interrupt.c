@@ -17,44 +17,11 @@
 #define MPIDR_AFF3(x) ((x >> 32) & 0xff)
 
 /* Wait for completion of a distributor change */
-static uint32_t gicv3_do_wait_for_rwp(volatile uint32_t *ctlr_addr)
+static void poll_rwp(volatile uint32_t *ctlr_addr)
 {
-    puts("Waiting for distributor to start up!\n");
-    uint32_t val;
-    bool waiting = true;
-    uint32_t ret = 0;
-
-    uint64_t gpt_cnt_tval = 0;
-    uint32_t deadline_ms =  GIC_DEADLINE_MS;
-    uint64_t gpt_cnt_ciel;
-
-    /* Check the value before reading the generic timer */
-    val = *ctlr_addr;
-    if (!(val & GICR_CTLR_RWP_BIT)) {
-        puts("Returning early?\n");
-        return 0;
+    while (*ctlr_addr & BIT(31)) {
+        asm("nop");
     }
-    MRS("cntpct_el0", gpt_cnt_tval);
-    gpt_cnt_ciel = gpt_cnt_tval + (deadline_ms * TICKS_PER_MS);
-
-    while (waiting) {
-        MRS("cntpct_el0", gpt_cnt_tval);
-        val = *ctlr_addr;
-
-        if (gpt_cnt_tval >= gpt_cnt_ciel) {
-            puts("GICV3 RWP Timeout after ");
-            puthex64(deadline_ms);
-            puts(" ms\n");
-            ret = 1;
-            waiting = false;
-
-        } else if (!(val & GICR_CTLR_RWP_BIT)) {
-            ret = 0;
-            waiting = false;
-        }
-    }
-    puts("Distributor has started up!\n");
-    return ret;
 }
 
 void init_gic_dist(uint64_t gic_regs) {
@@ -63,8 +30,11 @@ void init_gic_dist(uint64_t gic_regs) {
     // NOTE: We could just set this register to 0
     CLR_BIT_REG_MASK(gic_regs + GICD_CTLR, CTLR_ENABLE_G0_BIT | CTLR_ENABLE_G1S_BIT | CTLR_ENABLE_G1NS_BIT);
 
+    // Ensure that the GIC is actually disabled before continuing.
+    poll_rwp((uint32_t *)(gic_regs + GICD_CTLR));
+
     // Enable affinity routing for non secure and secure state.
-    SET_BIT_REG_MASK(gic_regs + GICD_CTLR, CTLR_ARE_NS_BIT | CTLR_ARE_NS_BIT);
+    SET_BIT_REG_MASK(gic_regs + GICD_CTLR, CTLR_ARE_S_BIT | CTLR_ARE_NS_BIT);
 
     // Setup the SPI's
 
@@ -108,30 +78,32 @@ void init_gic_dist(uint64_t gic_regs) {
     WRITE_REG_UINT32(gic_regs + GICD_CTLR, CTLR_ENABLE_G0_BIT | CTLR_ENABLE_G1S_BIT | CTLR_ENABLE_G1NS_BIT);
 
     // TODO: Need to actually wait for the distributor to actually start up.
-    gicv3_do_wait_for_rwp(gic_regs + GICD_CTLR);
+    poll_rwp((uint32_t *)(gic_regs + GICD_CTLR));
 
-    uint32_t mpidr = 0;
-    MRS("MPIDR_EL1", mpidr);
+    uint64_t mpidr = 0;
     uint64_t affinity = (uint64_t)MPIDR_AFF3(mpidr) << 32 | MPIDR_AFF2(mpidr) << 16 |
                         MPIDR_AFF1(mpidr) << 8  | MPIDR_AFF0(mpidr);;
-    puts("This is the affinity for this CPU: ");
-    puthex64(affinity);
-    puts("\n");
+    asm("dsb sy");
     // Set the affinity for all global interrupts to this CPU (assume CPU 0 for now).
     for (int i = MIN_SPI_ID; i < nr_lines; i++) {
         // TODO: We need to get the PE id of what we are currently running on.
         WRITE_REG_UINT64(gic_regs + GICD_IROUTER + ((sizeof(uint64_t)) * i),  (affinity << 32) | (affinity << 16) | (affinity << 8) | (affinity & 0xFF));
-        puts("Writing affinity!\n");
     }
-    puts("Finished?\n");
 }
 
 void init_gic_v3(uint64_t gic_regs) {
-    puts("In init gic_v3\n");
+    puts("\nIn init gic_v3\n");
 
+    puts("Initialising GIC distributor...\n");
     init_gic_dist(gic_regs);
 
-    puts("Finished GIC_v3 INIT!\n");
+    // Need to enable access to system regsiters. (ICC_SRE_EL1)
+    puts("Enabling access to CPU regsiters...\n");
+
+    // Configure re-distributor settings
+    puts("Initialising GIC redistributor...\n");
+
+    puts("Finished GIC_v3 INIT!\n\n");
 }
 
 void kernel_interrupt_handler() {

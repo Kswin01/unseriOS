@@ -65,7 +65,7 @@ build:
 all: $(LIBC) $(IMAGE_FILE)
 
 qemu: $(IMAGE_FILE)
-	$(QEMU) -machine virt \
+	$(QEMU) -machine virt,gic-version=3 \
 			-cpu cortex-a53 \
 			-device loader,file=$(IMAGE_FILE),addr=0x40100000,cpu-num=0 \
 			-m size=2G \
