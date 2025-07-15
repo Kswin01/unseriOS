@@ -13,20 +13,19 @@
 #include <qemu_virt_aarch64_registers.h>
 
 void kmain(void) {
-    // Enable UART device -> all setup for the PL011.
-    init_uart(PL011_UART_REGS);
+    // We need to setup kernel memory
+    // kernel_mem_init();
 
+    // Enable UART device -> all setup for the PL011.
+    init_uart(PADDR_TO_KERNEL_VADDR(PL011_UART_REGS));
+    // kernel_mem_init();
     puts("kernel_starting...\n\n-------------------- WELCOME TO unseriOS! --------------------\n\n");
 
     init_vector_table();
 
     // Enable the Generic Interrupt Controller
-    init_gic_v3(QEMU_GICV3_REGS);
+    init_gic_v3(PADDR_TO_KERNEL_VADDR(QEMU_GICV3_DIST_REGS), PADDR_TO_KERNEL_VADDR(QEMU_GICV3_RDIST_REGS));
 
-    // Deal with CPU state: Disable FPU, init exception vector tables, initialise IRQ controller
+    // Deal with CPU state
     init_cpu();
-
-    // We need to setup kernel memory: kernel virtual memory, stack pointer
-    // Setup kernel paging structures. Flush caches and invalidate TLB
-    kernel_mem_init();
 }

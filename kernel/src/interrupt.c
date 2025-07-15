@@ -24,24 +24,24 @@ static void poll_rwp(volatile uint32_t *ctlr_addr)
     }
 }
 
-void init_gic_dist(uint64_t gic_regs) {
+void init_gic_dist(uint64_t gic_dist_regs) {
     // Initialise the global GIC Distributor interface - This sequence is based on the seL4 GIC setup.
     // Disable Group 0, secure group 1 and non-secure group 1 interrupts.
     // NOTE: We could just set this register to 0
-    CLR_BIT_REG_MASK(gic_regs + GICD_CTLR, CTLR_ENABLE_G0_BIT | CTLR_ENABLE_G1S_BIT | CTLR_ENABLE_G1NS_BIT);
+    CLR_BIT_REG_MASK(gic_dist_regs + GICD_CTLR, CTLR_ENABLE_G0_BIT | CTLR_ENABLE_G1S_BIT | CTLR_ENABLE_G1NS_BIT);
 
     // Ensure that the GIC is actually disabled before continuing.
-    poll_rwp((uint32_t *)(gic_regs + GICD_CTLR));
+    poll_rwp((uint32_t *)(gic_dist_regs + GICD_CTLR));
 
     // Enable affinity routing for non secure and secure state.
-    SET_BIT_REG_MASK(gic_regs + GICD_CTLR, CTLR_ARE_S_BIT | CTLR_ARE_NS_BIT);
+    SET_BIT_REG_MASK(gic_dist_regs + GICD_CTLR, CTLR_ARE_S_BIT | CTLR_ARE_NS_BIT);
 
     // Setup the SPI's
 
     // The type register includes the maximum number of interrupt ID's that is supported by the
     // GIC implementation.
     uint32_t type;
-    READ_REG(type, gic_regs + GICD_TYPER);
+    READ_REG(type, gic_dist_regs + GICD_TYPER);
 
     // From GIC architecture spec:
     // "If the value of this field is N, the maximum SPI INTID is 32(N+1) minus 1."
@@ -54,14 +54,14 @@ void init_gic_dist(uint64_t gic_regs) {
         // Therefore we will increment this loop by 16.
 
         // We are assuming that all interrupts are initially level sensitive.
-        WRITE_REG_UINT32(gic_regs + GICD_ICFGR + (sizeof(uint32_t) * j), 0);
+        WRITE_REG_UINT32(gic_dist_regs + GICD_ICFGR + (sizeof(uint32_t) * j), 0);
     }
 
     // Set the prios of the global interrupts
     for (int i = MIN_SPI_ID, j = 0; i < nr_lines; i += 4, j++) {
         // For each interrupt priority register, we contain information for 4
         // interrupt id's. We will therefore increment this loop by 4.
-        WRITE_REG_UINT32(gic_regs + GICD_IPRIORITYR + (sizeof(uint32_t) * j), GICD_IPRIORITYR_DEF_VAL);
+        WRITE_REG_UINT32(gic_dist_regs + GICD_IPRIORITYR + (sizeof(uint32_t) * j), GICD_IPRIORITYR_DEF_VAL);
     }
 
     // Disable and clear all interrupts
@@ -69,16 +69,16 @@ void init_gic_dist(uint64_t gic_regs) {
         // For each interrupt priority register, we contain information for 32
         // interrupt id's. We will therefore increment this loop by 32.
         // Interrupt clear enable register. Writing 1 disables forwarding of the corresponding interrupt id.
-        WRITE_REG_UINT32(gic_regs + GICD_ICENABLER + (sizeof(uint32_t) * j), IRQ_SET_ALL);
+        WRITE_REG_UINT32(gic_dist_regs + GICD_ICENABLER + (sizeof(uint32_t) * j), IRQ_SET_ALL);
         // Interrupt clear pending register. Writing 1 sets the corresponding interrupt id from pending to inactive.
-        WRITE_REG_UINT32(gic_regs + GICD_ICPENDR + (sizeof(uint32_t) * j), IRQ_SET_ALL);
+        WRITE_REG_UINT32(gic_dist_regs + GICD_ICPENDR + (sizeof(uint32_t) * j), IRQ_SET_ALL);
     }
 
     // Enable the distributor
-    WRITE_REG_UINT32(gic_regs + GICD_CTLR, CTLR_ENABLE_G0_BIT | CTLR_ENABLE_G1S_BIT | CTLR_ENABLE_G1NS_BIT);
+    WRITE_REG_UINT32(gic_dist_regs + GICD_CTLR, CTLR_ENABLE_G0_BIT | CTLR_ENABLE_G1S_BIT | CTLR_ENABLE_G1NS_BIT);
 
     // TODO: Need to actually wait for the distributor to actually start up.
-    poll_rwp((uint32_t *)(gic_regs + GICD_CTLR));
+    poll_rwp((uint32_t *)(gic_dist_regs + GICD_CTLR));
 
     uint64_t mpidr = 0;
     uint64_t affinity = (uint64_t)MPIDR_AFF3(mpidr) << 32 | MPIDR_AFF2(mpidr) << 16 |
@@ -87,21 +87,33 @@ void init_gic_dist(uint64_t gic_regs) {
     // Set the affinity for all global interrupts to this CPU (assume CPU 0 for now).
     for (int i = MIN_SPI_ID; i < nr_lines; i++) {
         // TODO: We need to get the PE id of what we are currently running on.
-        WRITE_REG_UINT64(gic_regs + GICD_IROUTER + ((sizeof(uint64_t)) * i),  (affinity << 32) | (affinity << 16) | (affinity << 8) | (affinity & 0xFF));
+        WRITE_REG_UINT64(gic_dist_regs + GICD_IROUTER + ((sizeof(uint64_t)) * i),  (affinity << 32) | (affinity << 16) | (affinity << 8) | (affinity & 0xFF));
     }
 }
 
-void init_gic_v3(uint64_t gic_regs) {
+void init_gic_rdist(uint64_t gic_rdist_regs) {
+
+}
+
+void enable_sre() {
+    uint32_t sre;
+    MRS("ICC_SRE_EL1", sre);
+    MSR("ICC_SRE_EL1", sre | BIT(0));
+}
+
+void init_gic_v3(uint64_t gic_dist_regs, uint64_t gic_rdist_regs) {
     puts("\nIn init gic_v3\n");
 
     puts("Initialising GIC distributor...\n");
-    init_gic_dist(gic_regs);
+    init_gic_dist(gic_dist_regs);
 
     // Need to enable access to system regsiters. (ICC_SRE_EL1)
     puts("Enabling access to CPU regsiters...\n");
+    enable_sre();
 
     // Configure re-distributor settings
     puts("Initialising GIC redistributor...\n");
+    init_gic_rdist(gic_rdist_regs);
 
     puts("Finished GIC_v3 INIT!\n\n");
 }

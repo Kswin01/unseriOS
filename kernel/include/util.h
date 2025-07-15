@@ -37,10 +37,11 @@ puthex64(uint64_t val)
     puts(buffer);
 }
 
-#define BIT_32(nr)   (U(1) << (nr))
-#define BIT(nr) (1UL << (nr))
 #define U(x) (x##U)
 #define ULL(X) X##ULL
+#define BIT_64(nr) (ULL(1) << (nr))
+#define BIT_32(nr) (U(1) << (nr))
+#define BIT(nr) (1UL << (nr))
 
 #define READ_REG(var,addr) \
     (var = (*(volatile uint32_t *)addr))
@@ -73,3 +74,11 @@ puthex64(uint64_t val)
 #define HZ_IN_KHZ   ULL(1000)
 #define KHZ_IN_MHZ  ULL(1000)
 #define HZ_IN_MHZ   ULL(1000000)
+
+#define SECTION(sec) __attribute__((__section__(sec)))
+#define ALIGN(n)     __attribute__((__aligned__(n)))
+#define ALIGN_4K(x)  (((uintptr_t)(x) + ULL(0xFFF)) & ~ULL(0xFFF))
+
+/* THIS ALIGN BSS COMES FROM SEL4:include/linker.h
+data will be aligned to n bytes in a special BSS section */
+#define ALIGN_BSS(n) ALIGN(n) SECTION(".bss.aligned")
