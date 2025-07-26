@@ -37,6 +37,10 @@ uint64_t kernel_pud[512] ALIGN_BSS(AARCH64_SMALL_PAGE);
 uint64_t kernel_pds[512][512] ALIGN_BSS(AARCH64_SMALL_PAGE);
 
 
+uint64_t ident_pgd[512] ALIGN_BSS(AARCH64_SMALL_PAGE);
+uint64_t ident_pud[512] ALIGN_BSS(AARCH64_SMALL_PAGE);
+uint64_t ident_pds[512][512] ALIGN_BSS(AARCH64_SMALL_PAGE);
+
 void clean_and_invalidateL1() {
     /* Data synchronisation barrier. Ensures
      * the completion of memory accesses.
@@ -60,16 +64,21 @@ void clean_and_invalidateL1() {
     // outside of the processor, and then dependent on the
     // external memory system.
     // iallu - clean and invalidate ALL to PoU
-    // ialluis - clean and invalidate ALL to PoU Inner Sherable
+    // ialluis - clean and invalidate ALL to PoU
     asm volatile("ic iallu");
 
     asm volatile("dsb sy");
 }
 
+void tlb_invalidate() {
+    asm("nop");
+    return;
+}
+
 // Create a large page entry for the kernel page directories.
-uintptr_t large_page_entry(uintptr_t paddr, bool device_mem) {
-    uintptr_t page_entry = 0;
-    page_entry |= (paddr | ULL(0x0000FFFFFFFFF000));
+uint64_t large_page_entry(uint64_t paddr, bool device_mem) {
+    uint64_t page_entry = 0;
+    page_entry = (paddr & ULL(0xfffffffff000));
     // Leave BIT(1) = 0, designates a block entry.
     // Mark as valid
     page_entry |= BIT(0);
@@ -84,23 +93,19 @@ uintptr_t large_page_entry(uintptr_t paddr, bool device_mem) {
         page_entry |= (4 << 2);
     }
 
+    page_entry |= (1 << 10);
     return page_entry;
 }
 
 // Create a kernel translation table entry for a supplied
 // physical address.
-uintptr_t kernel_translation_table_entry(uintptr_t paddr) {
-    uintptr_t table_entry = 0;
-    table_entry |= (paddr | ULL(0x0000FFFFFFFFF000));
+uint64_t kernel_translation_table_entry(uint64_t paddr) {
+    uint64_t table_entry = 0;
+    table_entry = (paddr & ULL(0xfffffffff000));
     // Mark this as a table descriptor
     table_entry |= BIT(1);
     // Mark this as a valid entry
     table_entry |= BIT(0);
-    // As these are all kernel translation tables, mark them as
-    // UXN so that the user can never execute.
-    table_entry |= BIT_64(60);
-    // We will leave the AP[1:0] fields 0. This corresponds to
-    // priveleged read and write, with no user access.
     return table_entry;
 }
 
@@ -137,8 +142,11 @@ void kernel_setup_traslation_tables() {
     // translation tables and point them at each other.
     // Point first PGD entry to PUD
     kernel_pgd[511] = kernel_translation_table_entry(&kernel_pud);
+
     //Point first entry of PUD to PDs.
-    kernel_pud[511] = kernel_translation_table_entry(&kernel_pds);
+    for (int i = 0; i < 512; i++) {
+        kernel_pud[i] = kernel_translation_table_entry(&kernel_pds[i][0]);
+    }
 
     // @kwinter: Do we actually want to map into 0?
     uint64_t paddr = 0;
@@ -154,20 +162,23 @@ void kernel_setup_traslation_tables() {
     // any other regions of memory at this point.
     paddr = QEMU_PHYS_MEM_START;
     for (int i = 0; i < 512; i++) {
-        kernel_pds[GET_KERNEL_PD_INDEX(paddr)][i] = large_page_entry(paddr, true);
+        kernel_pds[GET_KERNEL_PD_INDEX(paddr)][i] = large_page_entry(paddr, false);
         paddr += AARCH64_LARGE_PAGE;
     }
 }
 
 void kernel_mmu_start() {
     // Invalidate the caches
-
+    clean_and_invalidateL1();
     // Write to the TTBR register
 
+    asm volatile("dsb sy");
+    MSR("ttbr1_el1", (void *)&kernel_pgd);
+    asm volatile("isb");
     // Write to the TCR
 
     // Invalidate the TLB
-
+    tlb_invalidate();
     // We also need to make sure that our PC is updated appropriately. (Could just add the correct offset to it)
     return;
 
@@ -181,7 +192,9 @@ void kernel_mem_init() {
     // puts("\nAttempting to setup kernel translation tables.\n");
     kernel_setup_traslation_tables();
     // puts("Finished setting up kernel translation tables!\n");
-    kernel_mmu_start();
+    // kernel_mmu_start();
+
+    // Setup kernel stack pointer
 
     // Our base physical address is where the linker has placed our image.
 
@@ -194,4 +207,52 @@ void kernel_mem_init() {
 
     // Map the kernel devices that we may need. (Serial)
 
+}
+
+void setup_ident_map() {
+    // We are just going to go through the statically created
+    // translation tables and point them at each other.
+    // Point first PGD entry to PUD
+    ident_pgd[0] = kernel_translation_table_entry((uint64_t)&ident_pud);
+    //Point first entry of PUD to PDs.
+
+    for (int i = 0; i < 512; i++) {
+        ident_pud[i] = kernel_translation_table_entry((uint64_t)&ident_pds[i][0]);
+    }
+
+    uint64_t paddr = 0;
+    // We will map the first GiB of physical memory to the kernel PD's.
+    // We will use large pages for these mappings
+    for (int i = 0; i < 512; i++) {
+        ident_pds[GET_IDENT_PD_INDEX(paddr)][i] = large_page_entry(paddr, true);
+        paddr += AARCH64_LARGE_PAGE;
+    }
+
+    // Now we can map in the 1GiB that covers our kernel.
+    // We don't need to really setup translations for
+    // any other regions of memory at this point.
+    paddr = QEMU_PHYS_MEM_START;
+    for (int i = 0; i < 512; i++) {
+        ident_pds[GET_IDENT_PD_INDEX(paddr)][i] = large_page_entry(paddr, false);
+        paddr += AARCH64_LARGE_PAGE;
+    }
+
+    uint64_t tcr = 0;
+
+    // T0SZ = 64 - VA bits => 48-bit VA space → T0SZ = 16
+    tcr |= (uint64_t)(16) << 0;
+    // IRGN0 = 0b00 → Normal memory, Inner Write-Back Write-Allocate
+    tcr |= (uint64_t)(0b00) << 6;
+    // ORGN0 = 0b00 → Normal memory, Outer Write-Back Write-Allocate
+    tcr |= (uint64_t)(0b00) << 8;
+    // SH0 = 0b11 → Inner Shareable
+    tcr |= (uint64_t)(0b11) << 12;
+    // TG0 = 0b00 → 4KB granule
+    tcr |= (uint64_t)(0b00) << 14;
+    // TBI0 = 0 → Top Byte Ignore disabled (safe default)
+    tcr |= (uint64_t)(0b0) << 37;
+
+    uint64_t maisr = 0xff;
+
+    enable_mmu((uint64_t)&ident_pgd, maisr, tcr);
 }

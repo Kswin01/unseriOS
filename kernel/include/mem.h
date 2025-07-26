@@ -26,23 +26,9 @@ extern uint64_t kernel_end[1];
 // Apply the kernel vaddr base offset, and then calculate the appropriate index.
 #define GET_KERNEL_PD_INDEX(x) (((x + KERNEL_VADDR_BASE) & ((uintptr_t)0x1ff << 30)) >> 30)
 
+// Functions to setup the indentity map
+#define GET_IDENT_PD_INDEX(x) (((x) & ((uintptr_t)0x1ff << 30)) >> 30)
+
 #define PADDR_TO_KERNEL_VADDR(x) (x + KERNEL_VADDR_BASE)
-
-// Paging structures
-typedef struct pt {
-    uint64_t pte[512];
-} pt_t;
-
-typedef struct pd {
-    pt_t pts[512];
-} pd_t;
-
-typedef struct pud {
-    pd_t pds[512];
-} pud_t;
-
-typedef struct pgd {
-    pud_t puds[2];
-} kernel_pgd_t;
 
 void kernel_mem_init();

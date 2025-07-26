@@ -17,7 +17,7 @@ void kmain(void) {
     // kernel_mem_init();
 
     // Enable UART device -> all setup for the PL011.
-    init_uart(PADDR_TO_KERNEL_VADDR(PL011_UART_REGS));
+    init_uart((PL011_UART_REGS));
     // kernel_mem_init();
     puts("kernel_starting...\n\n-------------------- WELCOME TO unseriOS! --------------------\n\n");
 

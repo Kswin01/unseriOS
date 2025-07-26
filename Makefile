@@ -13,7 +13,7 @@ LIBC_SRC := $(abspath libc/src)
 LIBC_INC := $(abspath libc/include)
 LIBC_OBJS := $(patsubst $(LIBC_SRC)/%.c, $(BUILD_DIR)/%.o, $(wildcard $(LIBC_SRC)/*.c))
 
-KERNEL_OBJS := $(addprefix $(BUILD_DIR)/, boot.o kernel.o interrupt.o uart.o cpu.o mem.o c_traps.o traps.o)
+KERNEL_OBJS := $(addprefix $(BUILD_DIR)/, boot.o kernel.o interrupt.o uart.o cpu.o mem.o c_traps.o traps.o mmu.o)
 
 # Move this to clang eventually
 TOOLCHAIN := aarch64-none-elf
@@ -69,8 +69,7 @@ qemu: $(IMAGE_FILE)
 			-cpu cortex-a53 \
 			-device loader,file=$(IMAGE_FILE),addr=0x40100000,cpu-num=0 \
 			-m size=2G \
-			-nographic \
- 			-d guest_errors
+			-nographic
 
 -include util/util.mk
 

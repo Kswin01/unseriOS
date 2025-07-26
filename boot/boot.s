@@ -1,8 +1,10 @@
+#include <assembly.h>
+
 .global _start
+.global ident_pgd
 _start:
     ldr x30, =stack_top
     mov sp, x30
-    
     // Check that we are in EL1
     msr     spsel, 1
     mrs     x0, CurrentEL
@@ -42,6 +44,8 @@ in_el1:
     mov     x0, 0b0101
     msr     spsr_el1, x0
     msr     DAIFSet, 0b1111
+
+    bl setup_ident_map
 
     bl kmain
     b .
