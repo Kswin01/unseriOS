@@ -45,7 +45,6 @@ in_el1:
     msr     spsr_el1, x0
     msr     DAIFSet, 0b1111
 
-    bl setup_ident_map
 
     bl kmain
     b .

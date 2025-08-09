@@ -41,6 +41,9 @@ uint64_t ident_pgd[512] ALIGN_BSS(AARCH64_SMALL_PAGE);
 uint64_t ident_pud[512] ALIGN_BSS(AARCH64_SMALL_PAGE);
 uint64_t ident_pds[512][512] ALIGN_BSS(AARCH64_SMALL_PAGE);
 
+void el1_mmu_enable();
+
+
 void clean_and_invalidateL1() {
     /* Data synchronisation barrier. Ensures
      * the completion of memory accesses.
@@ -179,34 +182,19 @@ void kernel_mmu_start() {
 
     // Invalidate the TLB
     tlb_invalidate();
+
+    // Set stack pointer -> (Do we need to clear this as well?)
+
     // We also need to make sure that our PC is updated appropriately. (Could just add the correct offset to it)
+
     return;
 
 }
 
 void kernel_mem_init() {
-    // puts("Initialising kernel memory! This is the end addr of the kernel: ");
-    puthex64(&kernel_end);
-    // puts("\nThis is the aligned address: ");
-    // puthex64(ALIGN_4K(kernel_end));
-    // puts("\nAttempting to setup kernel translation tables.\n");
     kernel_setup_traslation_tables();
-    // puts("Finished setting up kernel translation tables!\n");
-    // kernel_mmu_start();
 
-    // Setup kernel stack pointer
-
-    // Our base physical address is where the linker has placed our image.
-
-    // Need to setup the page tables for our kernel
-
-    // Construct our PGD, PUD, PD and PT's. We are going to map the kernel
-    // pages as small pages for now.
-
-    // Create all the PUD's at PGD[512]
-
-    // Map the kernel devices that we may need. (Serial)
-
+    el1_mmu_enable();
 }
 
 void setup_ident_map() {
@@ -236,23 +224,4 @@ void setup_ident_map() {
         ident_pds[GET_IDENT_PD_INDEX(paddr)][i] = large_page_entry(paddr, false);
         paddr += AARCH64_LARGE_PAGE;
     }
-
-    uint64_t tcr = 0;
-
-    // T0SZ = 64 - VA bits => 48-bit VA space → T0SZ = 16
-    tcr |= (uint64_t)(16) << 0;
-    // IRGN0 = 0b00 → Normal memory, Inner Write-Back Write-Allocate
-    tcr |= (uint64_t)(0b00) << 6;
-    // ORGN0 = 0b00 → Normal memory, Outer Write-Back Write-Allocate
-    tcr |= (uint64_t)(0b00) << 8;
-    // SH0 = 0b11 → Inner Shareable
-    tcr |= (uint64_t)(0b11) << 12;
-    // TG0 = 0b00 → 4KB granule
-    tcr |= (uint64_t)(0b00) << 14;
-    // TBI0 = 0 → Top Byte Ignore disabled (safe default)
-    tcr |= (uint64_t)(0b0) << 37;
-
-    uint64_t maisr = 0xff;
-
-    enable_mmu((uint64_t)&ident_pgd, maisr, tcr);
 }

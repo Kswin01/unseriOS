@@ -1,0 +1,9 @@
+
+
+int main(void) {
+    asm("nop");
+
+    // MAP THE UART IN SOMEHOW TO USERSPACE.
+    // OR PROVIDE A DEBUG API SO THAT THE
+    // KERNEL CAN PRINT IT INSTEAD
+}

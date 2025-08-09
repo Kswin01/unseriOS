@@ -32,7 +32,7 @@ vpath %.s $(BOOT_DIR) $(KERNEL_DIR)/src
 vpath %.S $(BOOT_DIR) $(KERNEL_DIR)/src
 
 CFLAGS := -ffreestanding -nostdlib -g3 -I$(KERNEL_INC) -I$(LIBC_INC)
-ASM_FLAGS := -I$(KERNEL_INC) 
+ASM_FLAGS := -I$(KERNEL_INC)
 LDFLAGS := -nostdlib -T$(LINKER_FILE)
 LIBS := $(LIBC)
 

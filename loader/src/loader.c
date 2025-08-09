@@ -1,6 +1,7 @@
 /* This is a single stage bootloader, responsible for copying out the kernel and a rootserver,
 and jumping to the kernel. */
 #include <stdint.h>
+#include <stdio.h>
 #include <stddef.h>
 
 #include <uart.h>
@@ -18,6 +19,15 @@ typedef struct loader_data {
 } loader_data_t;
 
 __attribute__((__section__(".loader_data"))) loader_data_t loader_config;
+
+// Dummy section decleration to remove linker errors
+__attribute__((section(".kernel_data"), used)) dummy_data = 1;
+
+extern const unsigned char __start_kernel_data[];
+extern const unsigned char __stop_kernel_data[];
+
+extern const unsigned char __start_initial_task[];
+extern const unsigned char __ened_initial_task[];
 
 static void *memcpy(void *dst, const void *src, size_t sz)
 {
@@ -58,16 +68,17 @@ void *memmove(void *restrict dest, const void *restrict src, size_t n)
 }
 
 void copy_data() {
-    printf("Copying kernel from %p to %p\n", loader_config.kernel_start, loader_config.kernel_vaddr);
-    memcpy(loader_config.kernel_vaddr, loader_config.kernel_start, loader_config.kernel_size);
-    printf("Copying rootserver from: %p to %p\n", loader_config.rootserver_start, loader_config.rootserver_vaddr);
-    memcpy(loader_config.rootserver_vaddr, loader_config.rootserver_start, loader_config.rootserver_size);
+    uintptr_t kernel_size = (uintptr_t) &__stop_kernel_data - (uintptr_t) &__start_kernel_data;
+    printf("Copying kernel from %p to %p\n", &__start_kernel_data, kernel_size);
+    // memcpy(loader_config.kernel_vaddr, &__start_kernel_data, &__end_kernel_data - &__start_kernel_data);
+    // printf("Copying rootserver from: %p to %p\n", loader_config.rootserver_start, loader_config.rootserver_vaddr);
+    // memcpy(loader_config.rootserver_vaddr, loader_config.rootserver_start, loader_config.rootserver_size);
 }
 
-int loader_main() {
+int lmain() {
     // First, initalise the UART.
     init_uart(PL011_UART_REGS);
-
+    printf("We are in the loader main!\n");
     // Copy data
     copy_data();
 

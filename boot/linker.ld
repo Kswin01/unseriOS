@@ -9,4 +9,12 @@ SECTIONS {
     . += 0x40000; /* 16kB of stack memory */
     stack_top = .;
     kernel_end = .;
+    . = ALIGN(8);
+    .initial_task :
+    {
+        __start_initial_task = .;
+        KEEP(*(.initial_task))
+        __stop_initial_task = .;
+    }
+    initial_task_end = .;
 }
