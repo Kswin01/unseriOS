@@ -1,7 +1,7 @@
 #include <assembly.h>
 
-.global kernel_pgd
-.global ident_pgd
+.extern kernel_pgd
+.extern ident_pgd
 .global enable_ident_mmu
 
 #define PSR_F_BIT         0x00000040
@@ -248,10 +248,6 @@ BEGIN_FUNC(el1_mmu_enable)
     ic  ialluis
     dsb ish
     isb
-    /* invalidate all TLB entries for EL2 */
-    tlbi    alle2is
-    dsb     ish
-    isb
 
     ldp x29, x30, [sp], #16
     ret
@@ -262,8 +258,14 @@ END_FUNC(el1_mmu_enable)
 enable_ident_mmu:
     dsb sy
     msr ttbr0_el1, x0
-    msr mair_el1, x1
-    msr tcr_el1, x2
+    msr ttbr1_el1, x1
+    msr mair_el1, x2
+    msr tcr_el1, x3
+    isb
+
+    /* invalidate all TLB entries for EL1 */
+    tlbi    vmalle1is
+    dsb     ish
     isb
 
     mrs x3, sctlr_el1
@@ -271,4 +273,10 @@ enable_ident_mmu:
     orr x3, x3, x4
     msr sctlr_el1, x3
     isb
+
+    /* Invalidate instruction cache */
+    ic  ialluis
+    dsb ish
+    isb
+
     ret

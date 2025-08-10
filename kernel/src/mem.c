@@ -196,23 +196,7 @@ void kernel_mmu_start() {
 void kernel_mem_init() {
     kernel_setup_traslation_tables();
     puts("Setup kernel translation tables!\n");
-    // el1_mmu_enable();
-    uint64_t tcr = 0;
-    // T0SZ = 64 - VA bits => 48-bit VA space → T0SZ = 16
-    tcr |= (uint64_t)(16) << 0;
-    // IRGN0 = 0b00 → Normal memory, Inner Write-Back Write-Allocate
-    tcr |= (uint64_t)(0b00) << 6;
-    // ORGN0 = 0b00 → Normal memory, Outer Write-Back Write-Allocate
-    tcr |= (uint64_t)(0b00) << 8;
-    // SH0 = 0b11 → Inner Shareable
-    tcr |= (uint64_t)(0b11) << 12;
-    // TG0 = 0b00 → 4KB granule
-    tcr |= (uint64_t)(0b00) << 14;
-    // TBI0 = 0 → Top Byte Ignore disabled (safe default)
-    tcr |= (uint64_t)(0b0) << 37;
-    uint64_t maisr = 0xff;
-
-    enable_ident_mmu((uint64_t)&ident_pgd, maisr, tcr);
+    el1_mmu_enable();
     puts("Enabled ident MMU!\n");
 }
 

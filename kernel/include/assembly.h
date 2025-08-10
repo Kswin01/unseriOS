@@ -24,3 +24,7 @@ _name:
 #define SCTLR_ICACHE_EN             ASM_BIT(12) /* Stage 1 instruction access cacheability control. */
 
 #define SCTLR_SET SCTLR_MMU_EN | SCTLR_ALIGN_CHECK_EN | SCTLR_STAGE1_CACHE | SCTLR_ICACHE_EN
+
+#define TCR_T0SZ(x)       ((64 - (x)))
+#define TCR_T1SZ(x)       ((64 - (x)) << 16)
+#define TCR_TxSZ(x)       (TCR_T0SZ(x) | TCR_T1SZ(x))
