@@ -1,6 +1,6 @@
 ENTRY(_start)
 SECTIONS {
-    . = 0x40100000; /* RAM starts at 0x40000000 but if we ask to load the kernel there, QEMU will not load a DTB */
+    . = 0xffffff8000000000; /* This is where the kernel will be in virtual memory */
     .startup . : { build/boot.o(.text) }
     .text : { *(.text) }
     .data : { *(.data) }

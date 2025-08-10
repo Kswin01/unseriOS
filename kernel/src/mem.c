@@ -163,7 +163,9 @@ void kernel_setup_traslation_tables() {
     // Now we can map in the 1GiB that covers our kernel.
     // We don't need to really setup translations for
     // any other regions of memory at this point.
-    paddr = QEMU_PHYS_MEM_START;
+
+    // We placed our kernel in the top gigabyte of our memory
+    paddr = QEMU_PHYS_MEM_START + (QEMU_MEM_SIZE / 2);
     for (int i = 0; i < 512; i++) {
         kernel_pds[GET_KERNEL_PD_INDEX(paddr)][i] = large_page_entry(paddr, false);
         paddr += AARCH64_LARGE_PAGE;
@@ -193,8 +195,25 @@ void kernel_mmu_start() {
 
 void kernel_mem_init() {
     kernel_setup_traslation_tables();
+    puts("Setup kernel translation tables!\n");
+    // el1_mmu_enable();
+    uint64_t tcr = 0;
+    // T0SZ = 64 - VA bits => 48-bit VA space → T0SZ = 16
+    tcr |= (uint64_t)(16) << 0;
+    // IRGN0 = 0b00 → Normal memory, Inner Write-Back Write-Allocate
+    tcr |= (uint64_t)(0b00) << 6;
+    // ORGN0 = 0b00 → Normal memory, Outer Write-Back Write-Allocate
+    tcr |= (uint64_t)(0b00) << 8;
+    // SH0 = 0b11 → Inner Shareable
+    tcr |= (uint64_t)(0b11) << 12;
+    // TG0 = 0b00 → 4KB granule
+    tcr |= (uint64_t)(0b00) << 14;
+    // TBI0 = 0 → Top Byte Ignore disabled (safe default)
+    tcr |= (uint64_t)(0b0) << 37;
+    uint64_t maisr = 0xff;
 
-    el1_mmu_enable();
+    enable_ident_mmu((uint64_t)&ident_pgd, maisr, tcr);
+    puts("Enabled ident MMU!\n");
 }
 
 void setup_ident_map() {

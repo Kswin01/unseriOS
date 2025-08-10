@@ -40,9 +40,9 @@ void kmain(void) {
     // We want to copy the initial task out into the top 1GiB
     copy_initial_task();
     // Setup a kernel identity map first, so we don't completely bork the PC
-    setup_ident_map();
+    // setup_ident_map();
     // Initialise our proper page tables, and enable the mmu
-    kernel_mem_init();
+    // kernel_mem_init();
     // We will reset the program counter and stack in kernel_mem_init,
     // and trampoline to kmain continued
 }

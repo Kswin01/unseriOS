@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "util.h"
 
 // Start of the kernel section
 #define KERNEL_ELF_PHYS_BASE 0x40100000
@@ -8,9 +9,9 @@
 extern uint64_t kernel_end[1];
 
 // This is where our kernel is going to mapped into
-#define KERNEL_VADDR_BASE  (uint64_t)(0xffffff8000000000)
+#define KERNEL_VADDR_BASE  ULL(0xffffff8000000000)
 // This is where the device section is going to go.
-#define KERNEL_VADDR_TOP  (uint64_t)(0xffffffffc0000000)
+#define KERNEL_VADDR_TOP  ULL(0xffffffffc0000000)
 
 #define KERNEL_MEM_OFFSET KERNEL_VADDR_BASE
 
@@ -19,7 +20,7 @@ extern uint64_t kernel_end[1];
 #define KERNEL_ELF_VADDR_BASE (KERNEL_VADDR_BASE + KERNEL_ELF_PHYS_BASE)
 
 // The last address that we supply to the users
-#define USER_TOP (uint64_t)(0x00007fffffffffff)
+#define USER_TOP ULL(0x00007fffffffffff)
 
 #define AARCH64_SMALL_PAGE 0x1000
 #define AARCH64_LARGE_PAGE 0x200000

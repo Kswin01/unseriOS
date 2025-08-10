@@ -1,7 +1,8 @@
 #include <assembly.h>
+
 .global kernel_pgd
-.global stack_top
-.global kmain_cont
+.global ident_pgd
+.global enable_ident_mmu
 
 #define PSR_F_BIT         0x00000040
 #define PSR_I_BIT         0x00000080
@@ -230,8 +231,8 @@ BEGIN_FUNC(el1_mmu_enable)
     msr     tcr_el1, x10
 
     /* Setup page tables */
-    adrp x8, ident_pgd
-    msr ttbr0_el1, x8
+    adrp    x8, ident_pgd
+    msr     ttbr0_el1, x8
     adrp    x8, kernel_pgd
     msr     ttbr1_el1, x8
     isb
@@ -243,13 +244,31 @@ BEGIN_FUNC(el1_mmu_enable)
 
     enable_mmu sctlr_el1, x8
 
-    /* set the new stack pointer */
-    ldr x7, stack_top
-    add x7, x7, KERNEL_NEW_BASE
-    adrp x8, PADDR_TO_NEW_VADDR(kmain_cont)
-
-    mov sp, x7
+    /* Invalidate instruction cache */
+    ic  ialluis
+    dsb ish
     isb
-    b x8
+    /* invalidate all TLB entries for EL2 */
+    tlbi    alle2is
+    dsb     ish
+    isb
+
+    ldp x29, x30, [sp], #16
+    ret
 
 END_FUNC(el1_mmu_enable)
+
+
+enable_ident_mmu:
+    dsb sy
+    msr ttbr0_el1, x0
+    msr mair_el1, x1
+    msr tcr_el1, x2
+    isb
+
+    mrs x3, sctlr_el1
+    ldr x4, =SCTLR_SET
+    orr x3, x3, x4
+    msr sctlr_el1, x3
+    isb
+    ret

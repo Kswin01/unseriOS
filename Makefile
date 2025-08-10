@@ -4,9 +4,12 @@ CURR_DIR := $(abspath .)
 BOOT_DIR := $(CURR_DIR)/boot
 KERNEL_DIR := $(CURR_DIR)/kernel
 KERNEL_INC := $(KERNEL_DIR)/include
+LOADER_DIR := $(CURR_DIR)/loader
 
 LINKER_FILE := $(BOOT_DIR)/linker.ld
+LOADER_LINKER_FILE := $(BOOT_DIR)/loader_linker.ld
 IMAGE_FILE := $(BUILD_DIR)/kernel.elf
+LOADER_IMAGE := $(BUILD_DIR)/loader.elf
 
 LIBC := $(BUILD_DIR)/libc.a
 LIBC_SRC := $(abspath libc/src)
@@ -14,7 +17,7 @@ LIBC_INC := $(abspath libc/include)
 LIBC_OBJS := $(patsubst $(LIBC_SRC)/%.c, $(BUILD_DIR)/%.o, $(wildcard $(LIBC_SRC)/*.c))
 
 KERNEL_OBJS := $(addprefix $(BUILD_DIR)/, boot.o kernel.o interrupt.o uart.o cpu.o mem.o c_traps.o traps.o mmu.o)
-
+LOADER_OBJS := $(addprefix $(BUILD_DIR)/, loader_boot.o mmu.o loader.o uart.o mem.o)
 # Move this to clang eventually
 TOOLCHAIN := aarch64-none-elf
 QEMU := qemu-system-aarch64
@@ -27,13 +30,15 @@ AR := $(TOOLCHAIN)-ar
 RANLIB := $(TOOLCHAIN)-ranlib
 OBJCOPY := $(TOOLCHAIN)-objcopy
 
-vpath %.c $(BOOT_DIR) $(KERNEL_DIR)/src
+vpath %.c $(BOOT_DIR) $(KERNEL_DIR)/src $(LOADER_DIR)/src
 vpath %.s $(BOOT_DIR) $(KERNEL_DIR)/src
 vpath %.S $(BOOT_DIR) $(KERNEL_DIR)/src
 
 CFLAGS := -ffreestanding -nostdlib -g3 -I$(KERNEL_INC) -I$(LIBC_INC)
 ASM_FLAGS := -I$(KERNEL_INC)
 LDFLAGS := -nostdlib -T$(LINKER_FILE)
+LOADER_LDFLAGS := -nostdlib -T$(LOADER_LINKER_FILE)
+
 LIBS := $(LIBC)
 
 $(BUILD_DIR)/%.o: %.c | build
@@ -46,9 +51,15 @@ $(BUILD_DIR)/%.o: %.S | build
 	$(CC) $(ASM_FLAGS) -x assembler-with-cpp -c -mcpu=$(CPU) $< -o $@
 
 # This is just the last linker step
+${LOADER_IMAGE}: $(LIBC) ${LOADER_OBJS} ${LOADER_LINKER_FILE} ${IMAGE_FILE}
+	$(LD) $(LOADER_LDFLAGS) $(LOADER_OBJS) $(LIBS) -o $(LOADER_IMAGE)
+	aarch64-none-elf-objcopy --update-section .kernel=$(IMAGE_FILE) ${LOADER_IMAGE}
+	@echo "----- BUILT LOADER -----"
+
+# This is just the last linker step
 ${IMAGE_FILE}: $(LIBC) ${KERNEL_OBJS} ${LINKER_FILE}
 	$(LD) $(LDFLAGS) $(KERNEL_OBJS) $(LIBS) -o $(IMAGE_FILE)
-	@echo "----- BUILT SYSTEM -----"
+	# @echo "----- BUILT KERNEL -----"
 
 # Build libc.a from all libc/src/*.c
 $(LIBC): $(LIBC_OBJS) | build
@@ -62,12 +73,12 @@ $(BUILD_DIR)/%.o: $(LIBC_SRC)/%.c | build
 build:
 	mkdir -p $(BUILD_DIR)
 
-all: $(LIBC) $(IMAGE_FILE)
+all: $(LIBC) ${IMAGE_FILE} $(LOADER_IMAGE)
 
-qemu: $(IMAGE_FILE)
+qemu: $(LOADER_IMAGE)
 	$(QEMU) -machine virt,gic-version=3 \
 			-cpu cortex-a53 \
-			-device loader,file=$(IMAGE_FILE),addr=0x40100000,cpu-num=0 \
+			-device loader,file=$(LOADER_IMAGE),addr=0x40100000,cpu-num=0 \
 			-m size=2G \
 			-nographic
 
