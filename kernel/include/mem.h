@@ -36,5 +36,3 @@ extern uint64_t kernel_end[1];
 #define TCR_T0SZ(x)       ((64 - (x)))
 #define TCR_T1SZ(x)       ((64 - (x)) << 16)
 #define TCR_TxSZ(x)       (TCR_T0SZ(x) | TCR_T1SZ(x))
-
-void kernel_mem_init();

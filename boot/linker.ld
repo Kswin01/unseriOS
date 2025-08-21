@@ -1,6 +1,6 @@
 ENTRY(_start)
 SECTIONS {
-    . = 0xffffff8000000000; /* This is where the kernel will be in virtual memory */
+    . = 0xffffff8080000000; /* This is where the kernel will be in virtual memory */
     .startup . : { build/boot.o(.text) }
     .text : { *(.text) }
     .data : { *(.data) }

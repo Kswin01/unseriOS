@@ -16,7 +16,7 @@ LIBC_SRC := $(abspath libc/src)
 LIBC_INC := $(abspath libc/include)
 LIBC_OBJS := $(patsubst $(LIBC_SRC)/%.c, $(BUILD_DIR)/%.o, $(wildcard $(LIBC_SRC)/*.c))
 
-KERNEL_OBJS := $(addprefix $(BUILD_DIR)/, boot.o kernel.o interrupt.o uart.o cpu.o mem.o c_traps.o traps.o mmu.o)
+KERNEL_OBJS := $(addprefix $(BUILD_DIR)/, boot.o kernel.o interrupt.o uart.o cpu.o c_traps.o traps.o)
 LOADER_OBJS := $(addprefix $(BUILD_DIR)/, loader_boot.o mmu.o loader.o uart.o mem.o)
 # Move this to clang eventually
 TOOLCHAIN := aarch64-none-elf
@@ -68,7 +68,7 @@ $(LIBC): $(LIBC_OBJS) | build
 
 # Compile libc .c files
 $(BUILD_DIR)/%.o: $(LIBC_SRC)/%.c | build
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -O3 -c $< -o $@
 
 build:
 	mkdir -p $(BUILD_DIR)

@@ -10,12 +10,5 @@ SECTIONS {
     stack_top = .;
     loader_end = .;
     . = ALIGN(8);
-    .kernel :
-    {
-        __start_kernel = .;
-        /* Reserve 100 pages for the kernel */
-       . += 0x100000;
-        __stop_kernel = .;
-    }
     kernel_end = .;
 }

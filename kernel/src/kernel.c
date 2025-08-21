@@ -33,12 +33,12 @@ void kmain(void) {
     // We need to setup kernel memory
 
     // Enable UART device -> all setup for the PL011.
-    init_uart((PL011_UART_REGS));
+    init_uart(PADDR_TO_KERNEL_VADDR(PL011_UART_REGS));
 
     puts("kernel_starting...\n\n-------------------- WELCOME TO unseriOS! --------------------\n\n");
 
     // We want to copy the initial task out into the top 1GiB
-    copy_initial_task();
+    // copy_initial_task();
     // Setup a kernel identity map first, so we don't completely bork the PC
     // setup_ident_map();
     // Initialise our proper page tables, and enable the mmu
