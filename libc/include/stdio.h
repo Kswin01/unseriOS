@@ -6,5 +6,5 @@
 
 // int printf(const char* __restrict, ...);
 int printer(const char* string, ...);
-int putchar(int);
+int _putchar(int);
 int puts(const char*);

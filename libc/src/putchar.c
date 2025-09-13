@@ -6,7 +6,7 @@
 volatile uint8_t *uart = (uint8_t *) PL011_UART_REGS;
 
 // @kwinter - TODO: implement an actual serial driver for the kernel
-int putchar(int ic) {
+int _putchar(int ic) {
     // char c = (char) ic;
     // *uart = c;
     // return ic;
