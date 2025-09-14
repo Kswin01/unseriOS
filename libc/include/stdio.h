@@ -1,6 +1,7 @@
 #pragma once
 
 #include <sys/cdefs.h>
+#include <printf.h>
 
 #define EOF (-1)
 
