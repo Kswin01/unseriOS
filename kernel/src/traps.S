@@ -55,12 +55,15 @@ BEGIN_FUNC(invalid_vector_entry)
 END_FUNC(invalid_vector_entry)
 
 BEGIN_FUNC(priv_el_sync)
-    // We should read the exception syndrome register (esr) here.
     b sync_abort
 END_FUNC(priv_el_sync)
 
 BEGIN_FUNC(priv_el_irq)
+    /* Disable interurpts */ 
+    msr     DAIFSet, 0b1111
+    isb
     b handle_interrupt
+
 END_FUNC(priv_el_irq)
 
 BEGIN_FUNC(priv_el_async)

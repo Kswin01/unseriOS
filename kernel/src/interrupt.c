@@ -19,6 +19,9 @@
 /* @kwinter: Put the actual number in, this is big enough for now.*/
 #define MAX_NUM_IRQS 512
 
+uint64_t gicd_regs;
+uint64_t gicr_regs;
+
 typedef struct irq {
     /* @kwinter: Add a callback function here */
     bool enabled;
@@ -50,14 +53,18 @@ void init_gic_dist(uint64_t gic_dist_regs) {
     // Initialise the global GIC Distributor interface - This sequence is based on the seL4 GIC setup.
     // Disable Group 0, secure group 1 and non-secure group 1 interrupts.
     // NOTE: We could just set this register to 0
-    CLR_BIT_REG_MASK(gic_dist_regs + GICD_CTLR, CTLR_ENABLE_G0_BIT | CTLR_ENABLE_G1S_BIT | CTLR_ENABLE_G1NS_BIT);
+    CLR_BIT_REG_MASK(gic_dist_regs + GICD_CTLR, 0);
 
     // Ensure that the GIC is actually disabled before continuing.
     poll_rwp((uint32_t *)(gic_dist_regs + GICD_CTLR));
 
     // Enable affinity routing for non secure and secure state.
-    SET_BIT_REG_MASK(gic_dist_regs + GICD_CTLR, CTLR_ARE_S_BIT | CTLR_ARE_NS_BIT);
-
+    // SET_BIT_REG_MASK(gic_dist_regs + GICD_CTLR, CTLR_ARE_S_BIT | CTLR_ARE_NS_BIT);
+    // uint32_t gicd_ctrl = 0xB7;
+    // printf("Setting gicd_ctrl to: 0b%b\n", gicd_ctrl);
+    // // Enable the distributor
+    // WRITE_REG_UINT32(gic_dist_regs + GICD_CTLR, gicd_ctrl);
+    // poll_rwp((uint32_t *)(gic_dist_regs + GICD_CTLR));
     // Setup the SPI's
 
     // The type register includes the maximum number of interrupt ID's that is supported by the
@@ -96,11 +103,6 @@ void init_gic_dist(uint64_t gic_dist_regs) {
         WRITE_REG_UINT32(gic_dist_regs + GICD_ICPENDR + (sizeof(uint32_t) * j), IRQ_SET_ALL);
     }
 
-    // Enable the distributor
-    WRITE_REG_UINT32(gic_dist_regs + GICD_CTLR, CTLR_ENABLE_G0_BIT | CTLR_ENABLE_G1S_BIT | CTLR_ENABLE_G1NS_BIT);
-
-    poll_rwp((uint32_t *)(gic_dist_regs + GICD_CTLR));
-
     uint64_t mpidr = get_mpidr();
     uint64_t affinity = (uint64_t)MPIDR_AFF3(mpidr) << 32 | MPIDR_AFF2(mpidr) << 16 |
                         MPIDR_AFF1(mpidr) << 8  | MPIDR_AFF0(mpidr);;
@@ -110,44 +112,53 @@ void init_gic_dist(uint64_t gic_dist_regs) {
         // TODO: We need to get the PE id of what we are currently running on.
         WRITE_REG_UINT64(gic_dist_regs + GICD_IROUTER + ((sizeof(uint64_t)) * i),  (affinity << 32) | (affinity << 16) | (affinity << 8) | (affinity & 0xFF));
     }
+
+    uint32_t gicd_ctrl = 0xB7;
+    printf("Setting gicd_ctrl to: 0b%b\n", gicd_ctrl);
+    // Enable the distributor
+    WRITE_REG_UINT32(gic_dist_regs + GICD_CTLR, gicd_ctrl);
+    poll_rwp((uint32_t *)(gic_dist_regs + GICD_CTLR));
 }
 
 void init_gic_rdist(uint64_t gic_rdist_regs) {
     /* Mark the RDIST as connected to this PE */
-    WRITE_REG_UINT32(gic_rdist_regs + GICR_WAKER, 0);
-    uint32_t gicr_waker;
-    READ_REG(gicr_waker, gic_rdist_regs + GICR_WAKER);
-    while (!(gicr_waker & (1 << 1))){
-        READ_REG(gicr_waker, gic_rdist_regs + GICR_WAKER);
-    }
+    /* @kwinter: Apparently QEMU skips the GICR handshake... */
+
+    // uint32_t gicr_waker;
+    // READ_REG(gicr_waker, gic_rdist_regs + U(0x14));
+    // gicr_waker &= ~0x2;
+    // WRITE_REG_UINT32(gic_rdist_regs + U(0x14), gicr_waker);
+    // asm volatile("dsb sy; isb" : : : "memory");;
+
+    // while (gicr_waker & (1 << 2)){
+    //     READ_REG(gicr_waker, gic_rdist_regs + GICR_WAKER);
+    //     printf("this is gicr waker: 0b%b\n", gicr_waker);
+    // }
 
     /* We are assuming single core for now. For sanity,
     check that the redistributor that we are using is associated
     with this PE */
-    printf("This is the typer address: %p\n", gic_rdist_regs + GICR_TYPER);
     uint32_t pe = get_pe();
     uint32_t gicr_typer;
     READ_REG(gicr_typer, gic_rdist_regs);
 
     gicr_typer = (gicr_typer >> 8) & 0xf;
-    printf("This is the gicr_type: 0x%x\n", gicr_typer);
     if (gicr_typer != pe) {
         printf("GIC_ERROR: Attempting to use the wrong redistributor!\n");
     }
 
     /* Deactivate SGI's and PPI's */
     WRITE_REG_UINT32(gic_rdist_regs + GICR_ICACTIVER0, ~0);
-    printf("Deactived the SGI's and PPI's\n");
 
     // /* Set the priority of the SGI's and PPI's */
     for (int i = 0; i < MIN_SPI_ID; i+=4) {
         WRITE_REG_UINT32(gic_rdist_regs + GICR_IPRIORITYR + (sizeof(uint32_t) * (i/4)), GICD_IPRIORITYR_DEF_VAL);
     }
-    printf("Finished setting the prio\n");
 
     /* Setup PPI's to be level triggered */
     /* NOTE: ICFGR1 is specifically for PPI's. */
     WRITE_REG_UINT32(gic_rdist_regs + GICR_ICFGR1, 0);
+    asm volatile("isb");
 }
 
 
@@ -161,20 +172,29 @@ void init_cpu_iface() {
     This defines what prio interrupts must have to be forwarded
     to a PE */
     MSR("ICC_PMR_EL1", 0xff); /* REMEMBER, prio's are reversed, 0 high, 255 low. */
-    MSR("ICC_BPR1_EL1", 0);
+    MSR("ICC_BPR1_EL1", 0x04);
+    MSR("ICC_BPR0_EL1", 0x04);
 
     /* Set EOI mode */
     uint32_t ctl;
     MRS("ICC_CTLR_EL1", ctl);
     /* This is for EOI mode. When set to 1, we only have priority
     drop. Interrupt drop is done in a seperate reg */
-    ctl |= BIT(1);
+    ctl |= BIT(1) | BIT(0);
     MSR("ICC_CTLR_EL1", ctl);
 
     /* Enable signalling of each interrupt group */
-    MSR("ICC_IGRPEN0_EL1", BIT(0));
-    MSR("ICC_IGRPEN1_EL1", BIT(0));
+    MSR("ICC_IGRPEN0_EL1", 1);
+    MSR("ICC_IGRPEN1_EL1", 1);
 
+    asm volatile("isb");
+}
+
+void enable_interrupts() {
+    uint32_t daif;
+    MRS("DAIF", daif);
+    daif &= ~(1 << 7);
+    MSR("DAIF", daif);
     asm volatile("isb");
 }
 
@@ -183,17 +203,24 @@ void enable_timer_irq(uint64_t gic_rdist_regs) {
     /* @kwinter: Fix this asap, add mechanism for
     registering an interrupt! */
 
+    /* Clear interrupt */
+    WRITE_REG_UINT32(gic_rdist_regs + GICR_ICPENDR0, BIT(30));
     /* Timer CNTP triggers interupt 30 */
     uint32_t isenable;
     READ_REG(isenable, gic_rdist_regs + GICR_ISENABLER0);
     isenable |= BIT(30);
-    WRITE_REG_UINT32(gic_rdist_regs + GICR_ISENABLER0, isenable);
+    WRITE_REG_UINT32(gic_rdist_regs + GICR_ISENABLER0, BIT(30));
+
     asm volatile("isb");
 
+    WRITE_REG_UINT32(gic_rdist_regs + GICR_IGROUPR0, BIT(30));
+    asm volatile("dsb sy; isb" : : : "memory");;
 }
 
 void init_gic_v3(uint64_t gic_dist_regs, uint64_t gic_rdist_regs) {
     printf("\nIn init gic_v3\n");
+    gicd_regs = gic_dist_regs;
+    gicr_regs = gic_rdist_regs;
     printf("This is the gic dist regs: %p --- and this is the gic rdist regs: %p\n", gic_dist_regs, gic_rdist_regs);
     printf("Initialising GIC distributor...\n");
     init_gic_dist(gic_dist_regs);
@@ -204,11 +231,36 @@ void init_gic_v3(uint64_t gic_dist_regs, uint64_t gic_rdist_regs) {
 
     printf("Enabling access to CPU regsiters...\n");
     init_cpu_iface(gic_rdist_regs);
+
+    /* @kwinter: We probably want to do this elsewhere, such as when
+    we are returning to a user application. */
+    enable_interrupts();
+
     enable_timer_irq(gic_rdist_regs);
 
     printf("Finished GIC_v3 INIT!\n\n");
 }
 
 void kernel_interrupt_handler() {
+    /* @kwinter: Only checking PPI's for now, extend this. */
+    uint32_t intid;
 
+    /* Get the intid of the current interrupt */
+    MRS("ICC_IAR1_EL1", intid);
+
+    switch (intid) {
+        case TIMER_INTERRUPT: {
+            handle_timer_interrupt();
+            break;
+        }
+        default:
+            printf("Received unknown interrupt: %d\n", intid);
+            kernel_halt();
+    }
+
+    MSR("ICC_EOIR1_EL1", intid);
+    /* Then deactivate the interrupt */
+    MSR("ICC_DIR_EL1", intid);
+
+    enable_interrupts();
 }

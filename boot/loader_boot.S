@@ -43,6 +43,7 @@ in_el2:
 in_el1:
     mov     x0, 0b0101
     msr     spsr_el1, x0
+    /* Disable interrutps */
     msr     DAIFSet, 0b1111
 
 

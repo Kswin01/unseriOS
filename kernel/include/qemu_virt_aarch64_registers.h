@@ -5,7 +5,7 @@
 #include "util.h"
 
 // Timer
-#define TIMER_INTERRUPT 
+#define TIMER_INTERRUPT 30
 
 // Serial
 #define PL011_UART_REGS 0x9000000

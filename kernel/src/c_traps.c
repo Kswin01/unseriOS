@@ -28,6 +28,9 @@ void __attribute__((externally_visible)) __attribute__((noinline)) sync_abort (v
     puts("This is the esr: ");
     puthex32(esr);
     puts("\n");
+    uint64_t far;
+    MRS("far_el1", far);
+    printf("This is far_el1: 0x%p\n", far);
     kernel_halt();
 }
 
@@ -39,8 +42,7 @@ void __attribute__((externally_visible)) __attribute__((noinline)) async_abort (
 
 
 void __attribute__((externally_visible)) __attribute__((noinline)) handle_interrupt (void) {
-    puts("We received an interrupt!\n");
-    kernel_halt();
+    kernel_interrupt_handler();
 }
 
 void init_vector_table(void) {

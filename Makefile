@@ -16,11 +16,12 @@ LIBC_SRC := $(abspath libc/src)
 LIBC_INC := $(abspath libc/include)
 LIBC_OBJS := $(patsubst $(LIBC_SRC)/%.c, $(BUILD_DIR)/%.o, $(wildcard $(LIBC_SRC)/*.c))
 
-KERNEL_OBJS := $(addprefix $(BUILD_DIR)/, boot.o kernel.o interrupt.o uart.o cpu.o c_traps.o traps.o)
+KERNEL_OBJS := $(addprefix $(BUILD_DIR)/, boot.o kernel.o interrupt.o uart.o cpu.o c_traps.o traps.o ktimer.o)
 LOADER_OBJS := $(addprefix $(BUILD_DIR)/, loader_boot.o mmu.o loader.o uart.o mem.o)
 # Move this to clang eventually
 TOOLCHAIN := aarch64-none-elf
-QEMU := qemu-system-aarch64
+# QEMU := qemu-system-aarch64
+QEMU := /Users/krishnanwinter/Documents/Personal/qemu/build/qemu-system-aarch64-unsigned
 CPU := cortex-a53
 
 CC := $(TOOLCHAIN)-gcc
@@ -76,12 +77,13 @@ build:
 all: $(LIBC) ${IMAGE_FILE} $(LOADER_IMAGE)
 
 qemu: $(LOADER_IMAGE)
-	$(QEMU) -machine virt,gic-version=3 \
+	$(QEMU) -machine virt,gic-version=3\
 			-cpu cortex-a53 \
 			-device loader,file=$(LOADER_IMAGE),addr=0x40100000,cpu-num=0 \
 			-m size=2G \
 			-nographic
 
+# --trace events=event_file
 -include util/util.mk
 
 # Clean build
